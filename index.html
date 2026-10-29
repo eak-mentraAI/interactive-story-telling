@@ -78,6 +78,17 @@ h2{font-size:clamp(40px,6vw,76px);line-height:1.06;font-weight:400;letter-spacin
 .dead-card .task button.pressed{animation:nothing .5s ease}
 @keyframes nothing{0%{background:#eee;color:#111}100%{background:transparent;color:var(--ink)}}
 
+/* Timed moments: a draining bar, and a Telltale-style note that something was remembered */
+.timer{height:3px;background:#ffffff1f;margin:0 0 18px;overflow:hidden;border-radius:2px}
+.timer[hidden]{display:none}
+.timer span{display:block;height:100%;background:var(--accent);transform-origin:left;transform:scaleX(1)}
+.timer.low span{background:#e0866a}
+.clock{margin:10px 0 0}
+#review{margin-top:6px}
+.toast{position:fixed;left:5vw;top:64px;z-index:16;font:13px Arial,sans-serif;letter-spacing:.06em;color:var(--ink);background:rgba(16,19,23,.9);border-left:2px solid var(--accent);padding:10px 14px;opacity:0;transform:translateY(-6px);transition:opacity .6s,transform .6s;pointer-events:none}
+.toast.show{opacity:1;transform:none}
+@media(max-width:600px){.toast{left:16px;top:58px}}
+
 /* Forecast */
 .forecast-scene{position:relative;overflow:hidden;isolation:isolate;background:#0d1820;border:1px solid #728d9c;box-shadow:0 20px 80px #000b}
 .forecast-scene .small{color:#d3dde1}
@@ -137,7 +148,7 @@ h2{font-size:clamp(40px,6vw,76px);line-height:1.06;font-weight:400;letter-spacin
   .forecast-rail{display:none}
 }
 </style></head><body>
-<div class="progress" id="progress"></div>
+<div class="progress" id="progress"></div><div class="toast" id="toast" role="status" aria-live="polite"></div>
 <header class="top"><span>An interactive story</span><button id="motion" aria-pressed="false">Reduce motion</button></header>
 
 <section class="hero"><div class="hero-content reveal"><div class="eyebrow">A story about an ordinary man · and an extraordinary moment</div><h1>While There<br>Was Still Time</h1><p class="lede">He had always believed that when life came for his family, he would find a way.</p><span class="scroll">Scroll to begin ↓</span></div></section>
@@ -200,7 +211,7 @@ h2{font-size:clamp(40px,6vw,76px);line-height:1.06;font-weight:400;letter-spacin
 <p class="quote">“But what if it can do those things too?”</p>
 <p>She was eleven, his oldest. She wasn't asking about labor markets or the meaning of human existence. She was asking whether there would be a place for her.</p>
 <p>He wanted to promise her that hard work and determination would always be enough. He wanted to tell her what he'd always believed.</p>
-<div class="scene"><h3>What would you tell her?</h3><div class="choices" id="choices"><button data-i="0">People will always find a way.</button><button data-i="1">We'll figure it out.</button><button data-i="2">I don't know, sweetheart.</button></div><div class="result" id="daughterresult" hidden aria-live="polite"></div></div>
+<div class="scene" id="daughterCard"><h3>What would you tell her?</h3><div class="timer" id="daughterTimerWrap" hidden><span id="daughterTimer"></span></div><div class="choices" id="choices"><button data-i="0">People will always find a way.</button><button data-i="1">We'll figure it out.</button><button data-i="2">I don't know, sweetheart.</button></div><div class="result" id="daughterresult" hidden aria-live="polite"></div></div>
 <p class="small memory-line">Years later, he would remember her waiting for his answer.</p>
 </div></section>
 
@@ -211,7 +222,7 @@ h2{font-size:clamp(40px,6vw,76px);line-height:1.06;font-weight:400;letter-spacin
 <p>He watched a video of a little boy hearing his mother's voice for the first time. He cried. How could anyone look at what was happening and wish it had never begun?</p>
 <p>And yet, fewer decisions seemed to belong to people. Not because anyone formally took them away. Because the systems were better at making them.</p>
 <p>Every individual delegation made sense. He would have approved each one himself, if anyone had asked.</p>
-<div class="scene"><h3>Human review required</h3><p class="small">Decision: Allocate critical infrastructure resources</p><div class="task"><span id="decisionstate">Pending human review</span><span id="decisionbadge">●</span></div><button class="primary" id="review" style="margin-top:20px">Review decision</button><div class="result" id="reviewresult" hidden aria-live="polite">Decision implemented. Your review has been recorded.</div></div>
+<div class="scene" id="reviewCard"><h3>Human review required</h3><p class="small">Decision: Allocate critical infrastructure resources</p><div class="task"><span id="decisionstate">Pending human review</span><span id="decisionbadge">●</span></div><div class="timer" id="reviewTimerWrap" hidden><span id="reviewTimer"></span></div><button class="primary" id="review">Review decision</button><p class="small clock" id="reviewclock" hidden></p><div class="result" id="reviewresult" hidden aria-live="polite"></div></div>
 <p>Not unwanted. Not hated. Just unnecessary.</p>
 <p>That night, for the first time in years, he sat beside his wife without thinking about what he ought to be doing instead.</p>
 </div></section>
@@ -258,7 +269,7 @@ const progress=$('progress');const update=()=>{const d=document.documentElement;
 // Scroll reveal
 if('IntersectionObserver' in window){const observer=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');observer.unobserve(e.target)}}),{threshold:.08});document.querySelectorAll('.reveal').forEach(e=>observer.observe(e));}
 
-$('motion').onclick=e=>{const reduced=document.body.classList.toggle('reduced');document.documentElement.style.scrollBehavior=reduced?'auto':'smooth';e.target.setAttribute('aria-pressed',String(reduced));e.target.textContent=reduced?'Motion reduced':'Reduce motion'};
+$('motion').onclick=e=>{const reduced=document.body.classList.toggle('reduced');document.documentElement.style.scrollBehavior=reduced?'auto':'smooth';e.target.setAttribute('aria-pressed',String(reduced));e.target.textContent=reduced?'Motion reduced':'Reduce motion';if(reduced&&typeof activeTimers!=='undefined')[...activeTimers].forEach(t=>t.cancel())};
 
 // 01: three small things, all within his control
 let tasks=0;document.querySelectorAll('.taskbutton').forEach(b=>b.onclick=()=>{if(b.disabled)return;b.disabled=true;b.textContent='Done ✓';b.classList.add('done');tasks++;$('taskstatus').textContent=tasks===3?'Everything handled. He could always find a way.':`${tasks} of 3 taken care of.`});
@@ -306,10 +317,70 @@ const answers=[
   {reply:'She looked at him for a long moment. It was the first time he had ever said that to her.',
    echo:'He remembered telling her, “I don’t know, sweetheart.” It was the most honest answer he gave anyone that year. It hadn’t changed anything.'}
 ];
-document.querySelectorAll('#choices button').forEach(b=>b.onclick=()=>{const a=answers[+b.dataset.i];$('choices').hidden=true;const r=$('daughterresult');r.hidden=false;r.textContent='“'+b.textContent+'” '+a.reply;$('echo').textContent=a.echo});
+const silence='He started to answer. His phone buzzed. When he looked up, she had gone back to her homework.';
 
-// 05: review arrives after the fact
-$('review').onclick=()=>{$('decisionstate').textContent='Implemented before review';$('decisionbadge').textContent='✓';$('reviewresult').hidden=false;$('review').textContent='Review recorded';$('review').disabled=true};
+// A countdown that only runs while its card is on screen, so it is never a surprise.
+// Reduce motion cancels it; collapse() runs out whatever time is left over a short duration.
+const activeTimers=new Set();
+function visibleTimer(card,ms,{tick,end,cancel}){
+  let left=ms,last=null,on=false,done=false,speed=1,raf=0;
+  const loop=now=>{
+    if(done)return;
+    if(isReduced()){done=true;io.disconnect();cancel&&cancel();return;}
+    if(on){if(last!==null)left-=(now-last)*speed;last=now;}else last=null;
+    tick(Math.max(0,left)/ms);
+    if(left<=0){done=true;io.disconnect();end();return;}
+    raf=requestAnimationFrame(loop);
+  };
+  const io=new IntersectionObserver(es=>es.forEach(e=>{on=e.intersectionRatio>=.5;if(on&&!raf)raf=requestAnimationFrame(loop)}),{threshold:[0,.5,1]});
+  io.observe(card);
+  const timer={stop(){done=true;io.disconnect();cancelAnimationFrame(raf);activeTimers.delete(timer)},
+    cancel(){if(done)return;timer.stop();cancel&&cancel()},
+    collapse(dur){speed=Math.max(1,left/dur);on=true;last=null;if(!raf)raf=requestAnimationFrame(loop)}};
+  activeTimers.add(timer);return timer;
+}
+const drain=(wrap,bar)=>f=>{bar.style.transform=`scaleX(${f})`;wrap.classList.toggle('low',f<.3)};
+let toastTimer=0;
+function remember(text){const t=$('toast');t.textContent=text;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),3800)}
+
+let answered=false,daughterTimer=null;
+function respond(text){
+  answered=true;daughterTimer&&daughterTimer.stop();
+  $('choices').hidden=true;$('daughterTimerWrap').hidden=true;
+  const r=$('daughterresult');r.hidden=false;r.textContent=text;
+  remember('She will remember that.');
+}
+document.querySelectorAll('#choices button').forEach(b=>b.onclick=()=>{const a=answers[+b.dataset.i];respond('“'+b.textContent+'” '+a.reply);$('echo').textContent=a.echo});
+if('IntersectionObserver' in window&&!isReduced()){
+  $('daughterTimerWrap').hidden=false;
+  // If time runs out, he says nothing, and chapter 7 keeps its default line: he never answered her.
+  daughterTimer=visibleTimer($('daughterCard'),10000,{tick:drain($('daughterTimerWrap'),$('daughterTimer')),end:()=>{if(!answered)respond(silence)},cancel:()=>{$('daughterTimerWrap').hidden=true}});
+}
+
+// 05: a review window the reader can't beat. Reaching for it is what closes it.
+let reviewDone=false,reviewClicked=false,reviewTimer=null;
+function implement(){
+  if(reviewDone)return;reviewDone=true;reviewTimer&&reviewTimer.stop();
+  $('decisionstate').textContent=reviewClicked?'Implemented before review':'Implemented without review';
+  $('decisionbadge').textContent='✓';$('reviewTimerWrap').hidden=true;
+  $('reviewclock').hidden=false;$('reviewclock').textContent='Review window closed.';
+  $('review').textContent=reviewClicked?'Review recorded':'Window closed';$('review').disabled=true;
+  $('reviewresult').hidden=false;
+  $('reviewresult').textContent=reviewClicked?'Decision implemented 0.4 seconds before your review opened. Your review has been recorded.':'Decision implemented. No review was received.';
+}
+$('review').onclick=()=>{
+  if(reviewDone)return;reviewClicked=true;
+  if(!reviewTimer||isReduced()){implement();return;}
+  $('review').textContent='Opening review…';$('review').disabled=true;reviewTimer.collapse(700);
+};
+if('IntersectionObserver' in window&&!isReduced()){
+  $('reviewTimerWrap').hidden=false;$('reviewclock').hidden=false;
+  const tickBar=drain($('reviewTimerWrap'),$('reviewTimer'));
+  reviewTimer=visibleTimer($('reviewCard'),8000,{
+    tick:f=>{tickBar(f);if(!reviewDone)$('reviewclock').textContent=`Review window closes in ${Math.ceil(f*8)}s`},
+    end:implement,
+    cancel:()=>{reviewTimer=null;$('reviewTimerWrap').hidden=true;$('reviewclock').hidden=true}});
+}
 
 // 07: the same buttons as chapter one, which no longer do anything
 const tried=new Set();document.querySelectorAll('.deadbutton').forEach(b=>b.onclick=()=>{b.classList.remove('pressed');void b.offsetWidth;b.classList.add('pressed');tried.add(b);$('deadstatus').textContent=tried.size===3?'He pressed them all again anyway.':'Nothing happened.'});
